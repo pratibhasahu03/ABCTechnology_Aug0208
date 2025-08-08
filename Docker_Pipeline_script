@@ -1,0 +1,68 @@
+pipeline
+{
+    agent any
+    stages
+    {
+        stage('Code checkout')
+        {
+            steps
+            {
+                git branch:'main', url:'https://github.com/pratibhasahu03/ABCTechnology_Aug0208.git'
+            }
+        }
+        
+        stage('Code Compile')
+        {
+            steps
+            {
+                sh 'mvn compile'
+            }
+        }
+        
+        stage('Code Test')
+        {
+            steps
+            {
+                sh 'mvn test'
+            }
+        }
+        
+        stage('Code Build')
+        {
+            steps
+            {
+                sh 'mvn package'
+            }
+        }
+        
+        stage('Build Docker Image')
+        {
+            steps
+            {
+                sh 'cd /var/lib/jenkins/workspace/$JOB_NAME/'
+                sh 'cp /var/lib/jenkins/workspace/$JOB_NAME/target/ABCtechnologies-1.0.war /var/lib/jenkins/workspace/$JOB_NAME/'
+                sh 'docker build -t myapp:$BUILD_NUMBER .'
+                sh 'docker tag myapp:$BUILD_NUMBER pratibha2830/igpapp:$BUILD_NUMBER'
+            }
+        }
+        
+        stage('Push Docker Image')
+        {
+            steps
+            {
+                withDockerRegistry([ credentialsId: "dockerhub", url:"" ])
+                {
+                    sh 'docker push pratibha2830/igpapp:$BUILD_NUMBER'
+                }
+            }
+        }
+        
+        stage('Deploy as Container')
+        {
+            steps
+            {
+                sh 'docker run -d -P pratibha2830/igpapp:$BUILD_NUMBER'
+            }
+        }
+    }
+}
