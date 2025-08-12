@@ -1,0 +1,69 @@
+- name: Build image and run container on Docker host
+  hosts: docker_hosts
+  become: true
+  vars:
+    app_name: myapp
+    image_tag: "{{ lookup('env','IMAGE_TAG') | default('v1.0.0') }}"
+    registry: "docker.io/myorg"  # change to your registry
+    full_image: "{{ registry }}/{{ app_name }}:{{ image_tag }}"
+    src_path: "/home/ubuntu/build"    # where Dockerfile and app code live on controller or remote
+    push_image: false
+  tasks:
+    - name: Ensure community.docker is available
+      ansible.builtin.meta: require_collection
+      args:
+        name: community.docker
+
+    - name: Copy app sources to controller (if building locally) - optional
+      when: inventory_hostname == 'localhost'
+      ansible.builtin.command: mkdir -p {{ src_path }}
+      # use git module or copy module as needed
+
+    - name: Build docker image (on controller) and push to registry (optional)
+      when: inventory_hostname == 'localhost'
+      community.docker.docker_image:
+        build:
+          path: ./
+        name: "{{ registry }}/{{ app_name }}"
+        tag: "{{ image_tag }}"
+        push: "{{ push_image }}"
+      register: built
+
+    - name: Pull image on docker host (if pushed to registry)
+      when: push_image | bool
+      community.docker.docker_image:
+        name: "{{ full_image }}"
+        source: pull
+
+    - name: Copy image to remote via docker save/load (if not using registry)
+      when: not push_image and inventory_hostname != 'localhost'
+      block:
+        - name: Save image locally
+          when: inventory_hostname == 'localhost'
+          community.docker.docker_image:
+            name: "{{ registry }}/{{ app_name }}"
+            tag: "{{ image_tag }}"
+            load_path: /tmp/{{ app_name }}-{{ image_tag }}.tar
+            state: present
+
+        - name: Transfer image tar to remote
+          when: inventory_hostname != 'localhost'
+          ansible.builtin.copy:
+            src: /tmp/{{ app_name }}-{{ image_tag }}.tar
+            dest: /tmp/{{ app_name }}-{{ image_tag }}.tar
+
+        - name: Load image on remote
+          when: inventory_hostname != 'localhost'
+          community.docker.docker_image:
+            load_path: /tmp/{{ app_name }}-{{ image_tag }}.tar
+
+    - name: Create / start container
+      community.docker.docker_container:
+        name: "{{ app_name }}"
+        image: "{{ full_image }}"
+        state: started
+        restart_policy: always
+        published_ports:
+          - "8080:80"   # map as appropriate
+        env:
+          ENV: production
