@@ -58,10 +58,10 @@ pipeline
         }
         
         stage('Deploy via Ansible') 
-    {
+        {
       steps {
-        sh "ansible-playbook -i inventory/hosts playbooks/build-and-run.yml -e IMAGE_TAG=${IMAGE_TAG} -e push_image=true"
-      }
+        sh "ansible-playbook -i inventory/hosts playbooks/build-and-run.yml -e IMAGE_TAG=pratibha2830/igpapp:${BUILD_NUMBER} -e push_image=true"
+        }
     }
     }
 }
