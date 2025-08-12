@@ -1,0 +1,36 @@
+pipeline {
+  agent any
+  environment {
+    REGISTRY = 'docker.io/myorg'
+    IMAGE = "${REGISTRY}/myapp"
+    IMAGE_TAG = "${env.BUILD_NUMBER ?: 'local'}"
+  }
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+    stage('Build Docker image') {
+      steps {
+        sh 'docker --version'
+        sh "docker build -t ${IMAGE}:${IMAGE_TAG} ."
+      }
+    }
+    stage('Push to Registry') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+          sh "docker push ${IMAGE}:${IMAGE_TAG}"
+        }
+      }
+    }
+    stage('Deploy via Ansible') {
+      steps {
+        // Ensure the Jenkins agent has ansible installed and ssh keys for hosts
+        sh "ansible-playbook -i inventory/hosts playbooks/build-and-run.yml -e IMAGE_TAG=${IMAGE_TAG} -e push_image=true"
+      }
+    }
+  }
+  post {
+    always { echo "Pipeline finished" }
+  }
+}
