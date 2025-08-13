@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: igpapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: igpapp
+  template:
+    metadata:
+      labels:
+        app: igpapp
+    spec:
+      containers:
+      - name: igpapp
+        image: "pratibha2830/igpapp:${BUILD_NUMBER}"
+        ports:
+        - containerPort: 80
