@@ -1,0 +1,16 @@
+---
+- name: Deploy app to Kubernetes
+  hosts: k8s
+  gather_facts: no
+  vars:
+    image_tag: "pratibha2830/igpapp:${BUILD_NUMBER}"
+  tasks:
+    - name: Apply Kubernetes Deployment
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../k8s/deployment.yml') }}"
+
+    - name: Apply Kubernetes Service
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', '../k8s/service.yml') }}"
